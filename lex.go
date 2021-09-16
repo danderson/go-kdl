@@ -13,6 +13,10 @@ func identifierCharacter(r rune) bool {
 		return false
 	}
 
+	if strings.IndexRune(spaces, r) >= 0 || strings.IndexRune(newline, r) >= 0 {
+		return false
+	}
+
 	const excluded = `\/<>{};=,"`
 	for _, e := range excluded {
 		if r == e {
@@ -37,6 +41,8 @@ func identifierStart(r rune) bool {
 
 const spaces = "\t \xA0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000"
 
+//go:generate stringer -type=tokenType -trimprefix=tok
+
 type tokenType int
 
 const (
@@ -47,11 +53,28 @@ const (
 	tokNewline
 	tokIgnoreNode
 	tokSpace
+	tokIdentifier
+	tokString
+	tokEqual
+	tokOpenBracket
+	tokCloseBracket
 )
 
 type token struct {
 	typ tokenType
-	err error // set iff typ==itemErr
+	err error  // for tokErr
+	str string // for tokIdentifier, tokString, tokInt, tokFloat
+}
+
+func (t token) String() string {
+	switch t.typ {
+	case tokErr:
+		return fmt.Sprintf("%s (%s)", t.typ, t.err)
+	case tokIdentifier, tokString, tokInt, tokFloat:
+		return fmt.Sprintf("%s (%q)", t.typ, t.str)
+	default:
+		return t.typ.String()
+	}
 }
 
 type lexer struct {
@@ -66,7 +89,7 @@ type lexer struct {
 	atEOF  bool   // flips once to true when lexer finds EOF
 }
 
-func newLexer(r io.Reader) *lexer {
+func NewLexer(r io.Reader) *lexer {
 	var br *bufio.Reader
 	if sr, ok := r.(*bufio.Reader); ok {
 		br = sr
@@ -92,9 +115,9 @@ func (l *lexer) Next() token {
 
 var lexClosed = errors.New("lexer closed")
 
-func (l *lexer) emit(typ tokenType) {
+func (l *lexer) emit(t token) {
 	select {
-	case l.tokens <- token{typ: typ}:
+	case l.tokens <- t:
 		l.rs = l.rs[:0]
 	case <-l.close:
 		// Will get recovered at the top level of lex()
@@ -113,11 +136,11 @@ func (l *lexer) err(format string, args ...interface{}) lexFn {
 
 const eof = -1 // outside the valid range for unicode codepoints
 
-func (l *lexer) next() rune {
+func (l *lexer) next() (r rune) {
 	if len(l.peekrs) > 0 {
-		r := l.peekrs[len(l.peekrs)-1]
+		l.rs = append(l.rs, l.peekrs[len(l.peekrs)-1])
 		l.peekrs = l.peekrs[:len(l.peekrs)-1]
-		return r
+		return l.last()
 	}
 	if l.atEOF {
 		return eof
@@ -152,6 +175,14 @@ func (l *lexer) peek() rune {
 	r := l.next()
 	l.backup()
 	return r
+}
+
+// returns last consumed rune
+func (l *lexer) last() rune {
+	if len(l.rs) == 0 {
+		return -1
+	}
+	return l.rs[len(l.rs)-1]
 }
 
 func (l *lexer) accept(valid string) bool {
@@ -203,14 +234,12 @@ func (l *lexer) lex() {
 		}
 	}()
 
-	for st := l.lexStart; st != nil; {
+	for st := l.lexAny; st != nil; {
 		st = st()
 	}
 }
 
-// lex an anything, switch to a more precise state when we know what
-// we have.
-func (l *lexer) lexStart() lexFn {
+func (l *lexer) lexAny() lexFn {
 	r := l.peek()
 	switch {
 	case r == eof:
@@ -219,10 +248,26 @@ func (l *lexer) lexStart() lexFn {
 		return l.lexNumber
 	case identifierStart(r):
 		return l.lexIdentifier
+	case r == '"':
+		return l.lexString
+	case r == '=':
+		l.next()
+		l.emit(token{typ: tokEqual})
+		return l.lexAny
+	case r == '{':
+		l.next()
+		l.emit(token{typ: tokOpenBracket})
+		return l.lexAny
+	case r == '}':
+		l.next()
+		l.emit(token{typ: tokCloseBracket})
+		return l.lexAny
 	case r == '/':
 		return l.lexComment
 	case strings.IndexRune(spaces, r) >= 0:
 		return l.lexSpace
+	case strings.IndexRune(newline, r) >= 0:
+		return l.lexNewline
 	default:
 		return l.err("don't know how to lex %q", r)
 	}
@@ -230,23 +275,27 @@ func (l *lexer) lexStart() lexFn {
 
 func (l *lexer) lexNumber() lexFn {
 	l.accept("+-")
+	if l.last() == '+' && !digit(l.peek()) {
+		// Woops, this is an identifier, not a number.
+		return l.lexIdentifier
+	}
 	if l.accept("0") {
 		// Could be a radix prefix, with simpler parsing rules.
 		switch l.next() {
 		case eof:
-			l.emit(tokInt)
+			l.emit(token{typ: tokInt, str: string(l.rs)})
 			return nil
 		case 'x':
 			l.acceptRun("0123456789abcdefABCDEF_")
-			l.emit(tokInt)
+			l.emit(token{typ: tokInt, str: string(l.rs)})
 			return l.lexSpace
 		case 'b':
 			l.acceptRun("01_")
-			l.emit(tokInt)
+			l.emit(token{typ: tokInt, str: string(l.rs)})
 			return l.lexSpace
 		case 'o':
 			l.acceptRun("01234567_")
-			l.emit(tokInt)
+			l.emit(token{typ: tokInt, str: string(l.rs)})
 			return l.lexSpace
 		}
 	}
@@ -263,9 +312,9 @@ func (l *lexer) lexNumber() lexFn {
 		l.acceptRun(digits)
 	}
 	if fl {
-		l.emit(tokFloat)
+		l.emit(token{typ: tokFloat, str: string(l.rs)})
 	} else {
-		l.emit(tokInt)
+		l.emit(token{typ: tokInt, str: string(l.rs)})
 	}
 	return l.lexSpace
 }
@@ -304,7 +353,7 @@ func (l *lexer) lexComment() lexFn {
 		}
 		return l.lexSpace
 	case '-':
-		l.emit(tokIgnoreNode)
+		l.emit(token{typ: tokIgnoreNode})
 		return l.lexSpace
 	default:
 		return l.err("unknown kind of comment \"/%s\"", r)
@@ -312,14 +361,111 @@ func (l *lexer) lexComment() lexFn {
 }
 
 func (l *lexer) lexIdentifier() lexFn {
-	return nil
+	if l.accept("r") {
+		if r := l.peek(); r == '#' || r == '"' {
+			// Woops, this is a raw string.
+			return l.lexRawString
+		}
+	}
+	if r := l.next(); !identifierStart(r) {
+		return l.err("unexpected rune %q at start of identifier", r)
+	}
+	for identifierCharacter(l.next()) {
+	}
+	l.backup()
+	l.emit(token{typ: tokIdentifier, str: string(l.rs)})
+	return l.lexAny
+}
+
+func (l *lexer) lexString() lexFn {
+	l.accept(`"`)
+	for {
+		l.until(`"\"`)
+		r := l.next()
+		switch r {
+		case eof:
+			return l.err("EOF during string")
+		case '"':
+			l.emit(token{typ: tokString, str: string(l.rs[1 : len(l.rs)-1])})
+			return l.lexAny
+		case '\\':
+			replacePoint := len(l.rs) - 1 // position of the \
+			replace := rune(eof)
+			r = l.next()
+			switch l.next() {
+			case 'n':
+				replace = '\n'
+			case 'r':
+				replace = '\r'
+			case 't':
+				replace = '\t'
+			case '\\':
+				replace = '\\'
+			case '/':
+				replace = '/'
+			case '"':
+				replace = '"'
+			case 'b':
+				replace = '\b'
+			case 'f':
+				replace = '\f'
+			case 'u':
+				replace = 0
+				for i := 0; i < 6; i++ {
+					r = l.next()
+					switch {
+					case r >= '0' && r <= '9':
+						replace = (replace << 4) + (r - '0')
+					case r >= 'a' && r <= 'z':
+						replace = (replace << 4) + (r - 'a' + 10)
+					case r >= 'A' && r <= 'Z':
+						replace = (replace << 4) + (r - 'A' + 10)
+					default:
+						if i == 0 {
+							return l.err("expected hex in \\u escape sequence, got %q", r)
+						}
+						break
+					}
+				}
+			default:
+				return l.err("unknown escape sequence \\%s", r)
+			}
+			l.rs = append(l.rs[:replacePoint], replace)
+		}
+	}
+}
+
+func (l *lexer) lexRawString() lexFn {
+	// Leading 'r' was accepted prior to entering this lex state.
+	hashes := 0
+	for l.next() == '#' {
+		hashes++
+	}
+	if l.last() != '"' {
+		return l.err("expected dquote, got %q", l.last())
+	}
+findEnd:
+	for {
+		l.until(`"`)
+		if r := l.next(); r != '"' {
+			return l.err("expected dquote, got %q", r)
+		}
+		for i := 0; i < hashes; i++ {
+			if !l.accept("#") {
+				// Turns out this wasn't the end of the string after all.
+				continue findEnd
+			}
+		}
+		l.emit(token{typ: tokString, str: string(l.rs[hashes+2 : len(l.rs)-hashes-1])})
+		return l.lexAny
+	}
 }
 
 func (l *lexer) lexSpace() lexFn {
 	l.acceptRun(spaces)
 	switch l.peek() {
 	case eof:
-		l.emit(tokSpace)
+		l.emit(token{typ: tokSpace})
 		return nil
 	case '\\':
 		l.next() // TODO: check if there _must_ be at least one space, currently accept zero.
@@ -336,8 +482,8 @@ func (l *lexer) lexSpace() lexFn {
 		}
 		return l.lexSpace
 	default:
-		l.emit(tokSpace)
-		return l.lexStart
+		l.emit(token{typ: tokSpace})
+		return l.lexAny
 	}
 }
 
@@ -345,6 +491,6 @@ func (l *lexer) lexNewline() lexFn {
 	if !l.acceptNewline() {
 		l.err("tried to lex newline when not at newline")
 	}
-	l.emit(tokNewline)
-	return l.lexSpace
+	l.emit(token{typ: tokNewline})
+	return l.lexAny
 }
