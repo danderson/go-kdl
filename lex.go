@@ -217,9 +217,9 @@ func (l *lexer) acceptRun(valid string) {
 }
 
 func (l *lexer) until(invalid string) {
-	for strings.IndexRune(invalid, l.next()) < 0 {
+	for strings.IndexRune(invalid, l.peek()) < 0 && l.peek() != eof {
+		l.next()
 	}
-	l.backup()
 }
 
 type lexFn func() lexFn
@@ -330,6 +330,9 @@ func (l *lexer) lexComment() lexFn {
 	switch r {
 	case '/':
 		l.until(newline)
+		if l.atEOF {
+			return nil
+		}
 		return l.lexNewline
 	case '*':
 		for depth := 1; depth > 0; {
@@ -356,7 +359,7 @@ func (l *lexer) lexComment() lexFn {
 		l.emit(token{typ: tokIgnoreNode})
 		return l.lexSpace
 	default:
-		return l.err("unknown kind of comment \"/%s\"", r)
+		return l.err("unknown kind of comment \"/%s\"", string(r))
 	}
 }
 
@@ -366,8 +369,7 @@ func (l *lexer) lexIdentifier() lexFn {
 			// Woops, this is a raw string.
 			return l.lexRawString
 		}
-	}
-	if r := l.next(); !identifierStart(r) {
+	} else if r := l.next(); !identifierStart(r) {
 		return l.err("unexpected rune %q at start of identifier", r)
 	}
 	for identifierCharacter(l.next()) {
@@ -380,7 +382,7 @@ func (l *lexer) lexIdentifier() lexFn {
 func (l *lexer) lexString() lexFn {
 	l.accept(`"`)
 	for {
-		l.until(`"\"`)
+		l.until(`"\\`)
 		r := l.next()
 		switch r {
 		case eof:
@@ -392,7 +394,7 @@ func (l *lexer) lexString() lexFn {
 			replacePoint := len(l.rs) - 1 // position of the \
 			replace := rune(eof)
 			r = l.next()
-			switch l.next() {
+			switch r {
 			case 'n':
 				replace = '\n'
 			case 'r':
@@ -410,6 +412,9 @@ func (l *lexer) lexString() lexFn {
 			case 'f':
 				replace = '\f'
 			case 'u':
+				if l.next() != '{' {
+					return l.err("expected open bracket after \\u, got %q", string(r))
+				}
 				replace = 0
 				for i := 0; i < 6; i++ {
 					r = l.next()
@@ -420,15 +425,17 @@ func (l *lexer) lexString() lexFn {
 						replace = (replace << 4) + (r - 'a' + 10)
 					case r >= 'A' && r <= 'Z':
 						replace = (replace << 4) + (r - 'A' + 10)
-					default:
+					case r == '}':
 						if i == 0 {
-							return l.err("expected hex in \\u escape sequence, got %q", r)
+							return l.err("no hex in \\u escape sequence")
 						}
 						break
+					default:
+						return l.err("unexpected hex in \\u escape sequence, got %q", string(r))
 					}
 				}
 			default:
-				return l.err("unknown escape sequence \\%s", r)
+				return l.err("unknown escape sequence \\%s", string(r))
 			}
 			l.rs = append(l.rs[:replacePoint], replace)
 		}
