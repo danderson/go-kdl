@@ -8,12 +8,17 @@ import (
 	"strings"
 )
 
+const (
+	newlineChars = "\x0D\x0A\x85\x0C\u2028\u2029"
+	spaceChars   = "\t \xA0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000"
+)
+
 func identifierCharacter(r rune) bool {
 	if r < 0x20 || r > 0x10FFFF {
 		return false
 	}
 
-	if strings.IndexRune(spaces, r) >= 0 || strings.IndexRune(newline, r) >= 0 {
+	if space(r) || newline(r) {
 		return false
 	}
 
@@ -39,7 +44,13 @@ func identifierStart(r rune) bool {
 	return identifierCharacter(r) && !digit(r)
 }
 
-const spaces = "\t \xA0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000"
+func newline(r rune) bool {
+	return strings.IndexRune(newlineChars, r) >= 0
+}
+
+func space(r rune) bool {
+	return strings.IndexRune(spaceChars, r) >= 0
+}
 
 //go:generate stringer -type=tokenType -trimprefix=tok
 
@@ -215,7 +226,7 @@ func (l *lexer) acceptNewline() bool {
 			l.next()
 		}
 		return true
-	case strings.IndexRune(newline, r) >= 0:
+	case newline(r):
 		return true
 	default:
 		return false
@@ -228,10 +239,17 @@ func (l *lexer) acceptRun(valid string) {
 	l.backup()
 }
 
-func (l *lexer) until(invalid string) {
+// until consumes runes until it encounters a rune in invalid, or
+// EOF. Returns whether the read was interrupted by EOF or invalid
+// characters.
+func (l *lexer) until(invalid string) (notEOF bool) {
 	for strings.IndexRune(invalid, l.peek()) < 0 && l.peek() != eof {
 		l.next()
 	}
+	if l.peek() == eof {
+		return false
+	}
+	return true
 }
 
 type lexFn func() lexFn
@@ -280,9 +298,9 @@ func (l *lexer) lexAny() lexFn {
 		return l.lexAny
 	case r == '/':
 		return l.lexComment
-	case strings.IndexRune(spaces, r) >= 0:
+	case space(r):
 		return l.lexSpace
-	case strings.IndexRune(newline, r) >= 0:
+	case newline(r):
 		return l.lexNewline
 	default:
 		return l.err("don't know how to lex %q", r)
@@ -337,8 +355,6 @@ func (l *lexer) lexNumber() lexFn {
 	return l.lexSpace
 }
 
-const newline = "\x0D\x0A\x85\x0C\u2028\u2029"
-
 func (l *lexer) lexComment() lexFn {
 	if l.next() != '/' {
 		panic("how did we end up in lexComment without a slash?!")
@@ -347,18 +363,17 @@ func (l *lexer) lexComment() lexFn {
 	r := l.next()
 	switch r {
 	case '/':
-		l.until(newline)
-		l.ignore()
-		if l.atEOF {
+		if !l.until(newlineChars) {
 			return nil
 		}
+		l.ignore()
 		return l.lexNewline
 	case '*':
 		for depth := 1; depth > 0; {
-			l.until("*/")
-			switch l.next() {
-			case eof:
+			if !l.until("*/") {
 				return l.err("EOF during multiline comment")
+			}
+			switch l.next() {
 			case '*':
 				if l.peek() != '/' {
 					continue
@@ -402,18 +417,17 @@ func (l *lexer) lexIdentifier() lexFn {
 func (l *lexer) lexString() lexFn {
 	l.accept(`"`)
 	for {
-		l.until(`"\\`)
-		r := l.next()
-		switch r {
-		case eof:
+		if !l.until(`"\\`) {
 			return l.err("EOF during string")
+		}
+		switch l.next() {
 		case '"':
 			l.emit(token{typ: tokString, str: string(l.rs[1 : len(l.rs)-1])})
 			return l.lexAny
 		case '\\':
 			replacePoint := len(l.rs) - 1 // position of the \
 			replace := rune(eof)
-			r = l.next()
+			r := l.next()
 			switch r {
 			case 'n':
 				replace = '\n'
@@ -474,10 +488,10 @@ func (l *lexer) lexRawString() lexFn {
 	}
 findEnd:
 	for {
-		l.until(`"`)
-		if r := l.next(); r != '"' {
-			return l.err("expected dquote, got %q", r)
+		if !l.until(`"`) {
+			return l.err("EOF in raw string")
 		}
+		l.accept(`"`)
 		for i := 0; i < hashes; i++ {
 			if !l.accept("#") {
 				// Turns out this wasn't the end of the string after all.
@@ -490,23 +504,25 @@ findEnd:
 }
 
 func (l *lexer) lexSpace() lexFn {
-	if !l.accept(spaces) {
+	if !l.accept(spaceChars) {
 		return l.lexAny
 	}
-	l.acceptRun(spaces)
+	l.acceptRun(spaceChars)
 	switch l.peek() {
 	case eof:
 		l.emit(token{typ: tokSpace})
 		return nil
 	case '\\':
 		l.next() // TODO: check if there _must_ be at least one space, currently accept zero.
-		l.acceptRun(spaces)
+		l.acceptRun(spaceChars)
 		if l.peek() == '/' {
 			l.next()
 			if r := l.peek(); r != '/' {
 				return l.err("unexpected rune %q in newline continuation", r)
 			}
-			l.until(newline)
+			if !l.until(newlineChars) {
+				return nil
+			}
 		}
 		if !l.acceptNewline() {
 			return l.err("unexpected rune %q in newline continuation", l.peek())

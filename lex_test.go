@@ -35,7 +35,7 @@ func TestConformance(t *testing.T) {
 				tok := l.Next()
 				fmt.Fprintln(&b, tok)
 				if tok.typ == tokErr {
-					t.Fatalf("got error:\n%s", b.String())
+					t.Fatalf("got error:\n%s\n%s", b.String(), string(bs))
 				} else if tok.typ == tokEOF {
 					break
 				}
