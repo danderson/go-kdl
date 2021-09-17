@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
@@ -58,6 +59,7 @@ const (
 	tokEqual
 	tokOpenBracket
 	tokCloseBracket
+	tokSemicolon
 )
 
 type token struct {
@@ -185,6 +187,10 @@ func (l *lexer) last() rune {
 	return l.rs[len(l.rs)-1]
 }
 
+func (l *lexer) ignore() {
+	l.rs = l.rs[:0]
+}
+
 func (l *lexer) accept(valid string) bool {
 	if strings.IndexRune(valid, l.next()) >= 0 {
 		return true
@@ -262,6 +268,10 @@ func (l *lexer) lexAny() lexFn {
 		l.next()
 		l.emit(token{typ: tokCloseBracket})
 		return l.lexAny
+	case r == ';':
+		l.next()
+		l.emit(token{typ: tokSemicolon})
+		return l.lexAny
 	case r == '/':
 		return l.lexComment
 	case strings.IndexRune(spaces, r) >= 0:
@@ -297,6 +307,8 @@ func (l *lexer) lexNumber() lexFn {
 			l.acceptRun("01234567_")
 			l.emit(token{typ: tokInt, str: string(l.rs)})
 			return l.lexSpace
+		default:
+			l.backup()
 		}
 	}
 	// Full decimal/float.
@@ -330,6 +342,7 @@ func (l *lexer) lexComment() lexFn {
 	switch r {
 	case '/':
 		l.until(newline)
+		l.ignore()
 		if l.atEOF {
 			return nil
 		}
@@ -354,6 +367,7 @@ func (l *lexer) lexComment() lexFn {
 				depth++
 			}
 		}
+		l.ignore()
 		return l.lexSpace
 	case '-':
 		l.emit(token{typ: tokIgnoreNode})
@@ -416,20 +430,22 @@ func (l *lexer) lexString() lexFn {
 					return l.err("expected open bracket after \\u, got %q", string(r))
 				}
 				replace = 0
+			parseHex:
 				for i := 0; i < 6; i++ {
+					fmt.Fprintf(os.Stderr, "replace is %d\n", replace)
 					r = l.next()
 					switch {
 					case r >= '0' && r <= '9':
 						replace = (replace << 4) + (r - '0')
-					case r >= 'a' && r <= 'z':
+					case r >= 'a' && r <= 'f':
 						replace = (replace << 4) + (r - 'a' + 10)
-					case r >= 'A' && r <= 'Z':
+					case r >= 'A' && r <= 'F':
 						replace = (replace << 4) + (r - 'A' + 10)
 					case r == '}':
 						if i == 0 {
 							return l.err("no hex in \\u escape sequence")
 						}
-						break
+						break parseHex
 					default:
 						return l.err("unexpected hex in \\u escape sequence, got %q", string(r))
 					}
@@ -437,6 +453,7 @@ func (l *lexer) lexString() lexFn {
 			default:
 				return l.err("unknown escape sequence \\%s", string(r))
 			}
+			fmt.Fprintf(os.Stderr, "replace is %d\n", replace)
 			l.rs = append(l.rs[:replacePoint], replace)
 		}
 	}
@@ -469,6 +486,9 @@ findEnd:
 }
 
 func (l *lexer) lexSpace() lexFn {
+	if !l.accept(spaces) {
+		return l.lexAny
+	}
 	l.acceptRun(spaces)
 	switch l.peek() {
 	case eof:

@@ -1,0 +1,12 @@
+IgnoreNode
+Space
+Identifier ("node")
+Space
+Float ("1.0")
+Space
+String ("a")
+Space
+Identifier ("b")
+Equal
+String ("b\n")
+EOF

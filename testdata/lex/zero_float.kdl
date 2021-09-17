@@ -1,0 +1,5 @@
+Identifier ("node")
+Space
+Float ("0.0")
+Newline
+EOF

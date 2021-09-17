@@ -1,0 +1,6 @@
+Identifier ("node")
+Space
+Identifier ("prop")
+Equal
+Identifier ("null")
+EOF

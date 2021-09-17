@@ -1,0 +1,10 @@
+Identifier ("node")
+Space
+Identifier ("prop1")
+Equal
+Identifier ("true")
+Space
+Identifier ("prop2")
+Equal
+Identifier ("false")
+EOF

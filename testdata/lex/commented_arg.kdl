@@ -1,0 +1,8 @@
+Identifier ("node")
+Space
+IgnoreNode
+Space
+String ("arg1")
+Space
+String ("arg2")
+EOF

@@ -1,0 +1,6 @@
+Identifier ("node")
+Space
+String ("0prop")
+Equal
+String ("val")
+EOF

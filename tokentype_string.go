@@ -20,11 +20,12 @@ func _() {
 	_ = x[tokEqual-9]
 	_ = x[tokOpenBracket-10]
 	_ = x[tokCloseBracket-11]
+	_ = x[tokSemicolon-12]
 }
 
-const _tokenType_name = "EOFErrIntFloatNewlineIgnoreNodeSpaceIdentifierStringEqualOpenBracketCloseBracket"
+const _tokenType_name = "EOFErrIntFloatNewlineIgnoreNodeSpaceIdentifierStringEqualOpenBracketCloseBracketSemicolon"
 
-var _tokenType_index = [...]uint8{0, 3, 6, 9, 14, 21, 31, 36, 46, 52, 57, 68, 80}
+var _tokenType_index = [...]uint8{0, 3, 6, 9, 14, 21, 31, 36, 46, 52, 57, 68, 80, 89}
 
 func (i tokenType) String() string {
 	if i < 0 || i >= tokenType(len(_tokenType_index)-1) {

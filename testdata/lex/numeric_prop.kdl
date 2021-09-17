@@ -1,0 +1,6 @@
+Identifier ("node")
+Space
+Identifier ("prop")
+Equal
+Float ("10.0")
+EOF

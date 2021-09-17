@@ -1,0 +1,7 @@
+Identifier ("node")
+Space
+String ("")
+Equal
+String ("empty")
+Newline
+EOF

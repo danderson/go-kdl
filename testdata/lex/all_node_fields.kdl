@@ -1,0 +1,16 @@
+Identifier ("node")
+Space
+String ("arg")
+Space
+Identifier ("prop")
+Equal
+String ("val")
+Space
+OpenBracket
+Newline
+Space
+Identifier ("inner_node")
+Space
+Newline
+CloseBracket
+EOF

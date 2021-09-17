@@ -1,0 +1,5 @@
+Identifier ("node")
+Space
+String ("\nhello\nworld\n")
+Newline
+EOF

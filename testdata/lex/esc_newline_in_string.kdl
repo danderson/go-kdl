@@ -1,0 +1,4 @@
+Identifier ("node")
+Space
+String ("hello\nworld")
+EOF

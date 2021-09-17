@@ -1,0 +1,12 @@
+Identifier ("node_1")
+Space
+String ("arg\\n")
+Newline
+Identifier ("node_2")
+Space
+String ("\"arg\\n\"and stuff")
+Newline
+Identifier ("node_3")
+Space
+String ("#\"arg\\n\"#and stuff")
+EOF

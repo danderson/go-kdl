@@ -1,0 +1,8 @@
+Identifier ("node")
+Space
+Int ("-10")
+Space
+Identifier ("prop")
+Equal
+Int ("-15")
+EOF

@@ -1,0 +1,4 @@
+Identifier ("node")
+Space
+String (" hey\neveryone\nhow goes?\n")
+EOF

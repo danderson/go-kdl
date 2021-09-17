@@ -1,0 +1,8 @@
+Identifier ("node")
+Space
+String ("arg")
+Space
+Identifier ("arg")
+Equal
+String ("val")
+EOF

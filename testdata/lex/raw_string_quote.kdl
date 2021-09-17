@@ -1,0 +1,4 @@
+Identifier ("node")
+Space
+String ("a\"b")
+EOF

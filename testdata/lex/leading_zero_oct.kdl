@@ -1,0 +1,5 @@
+Identifier ("node")
+Space
+Int ("0o01")
+Newline
+EOF

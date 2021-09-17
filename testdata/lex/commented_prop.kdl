@@ -1,0 +1,10 @@
+Identifier ("node")
+Space
+IgnoreNode
+Space
+Identifier ("prop")
+Equal
+String ("val")
+Space
+String ("arg")
+EOF

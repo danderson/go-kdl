@@ -1,0 +1,5 @@
+Identifier ("foo123~!@#$%^&*.:'|?+")
+Space
+String ("weeee")
+Newline
+EOF

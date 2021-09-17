@@ -1,0 +1,8 @@
+Identifier ("node")
+Space
+Float ("-1.0")
+Space
+Identifier ("key")
+Equal
+Float ("-10.0")
+EOF

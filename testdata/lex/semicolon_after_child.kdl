@@ -1,0 +1,11 @@
+Identifier ("node")
+Space
+OpenBracket
+Newline
+Space
+Identifier ("childnode")
+Newline
+CloseBracket
+Semicolon
+Newline
+EOF

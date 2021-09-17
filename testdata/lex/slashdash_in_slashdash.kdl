@@ -1,0 +1,10 @@
+IgnoreNode
+Space
+Identifier ("node1")
+Space
+IgnoreNode
+Space
+Float ("1.0")
+Newline
+Identifier ("node2")
+EOF

@@ -1,0 +1,5 @@
+Identifier ("r")
+Space
+String ("arg")
+Newline
+EOF

@@ -1,0 +1,5 @@
+Identifier ("node1")
+Newline
+Space
+Identifier ("node2")
+EOF

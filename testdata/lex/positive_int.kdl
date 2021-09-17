@@ -1,0 +1,4 @@
+Identifier ("node")
+Space
+Int ("+10")
+EOF

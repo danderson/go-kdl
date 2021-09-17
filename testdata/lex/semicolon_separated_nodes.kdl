@@ -1,0 +1,7 @@
+Identifier ("node1")
+Semicolon
+Space
+Identifier ("node2")
+Semicolon
+Space
+EOF

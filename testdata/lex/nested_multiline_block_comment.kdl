@@ -1,0 +1,7 @@
+Identifier ("node")
+Space
+Space
+String ("arg")
+Newline
+Space
+EOF

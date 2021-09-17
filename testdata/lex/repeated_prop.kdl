@@ -1,0 +1,10 @@
+Identifier ("node")
+Space
+Identifier ("prop")
+Equal
+Int ("10")
+Space
+Identifier ("prop")
+Equal
+Int ("11")
+EOF

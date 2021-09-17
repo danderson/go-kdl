@@ -1,0 +1,11 @@
+IgnoreNode
+Space
+Identifier ("node")
+Space
+OpenBracket
+Newline
+Space
+Identifier ("node2")
+Newline
+CloseBracket
+EOF

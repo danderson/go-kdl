@@ -1,0 +1,18 @@
+Identifier ("node_1")
+Space
+Identifier ("prop")
+Equal
+String ("arg\\n")
+Newline
+Identifier ("node_2")
+Space
+Identifier ("prop")
+Equal
+String ("\"arg\"\\n")
+Newline
+Identifier ("node_3")
+Space
+Identifier ("prop")
+Equal
+String ("#\"arg\"#\\n")
+EOF

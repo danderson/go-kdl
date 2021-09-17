@@ -1,0 +1,13 @@
+Identifier ("node")
+Space
+String ("arg")
+Space
+IgnoreNode
+Space
+OpenBracket
+Newline
+Space
+Identifier ("inner_node")
+Newline
+CloseBracket
+EOF

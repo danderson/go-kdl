@@ -1,0 +1,26 @@
+Identifier ("node")
+Space
+Int ("1")
+Space
+Float ("1.0")
+Space
+Float ("1.0e10")
+Space
+Float ("1.0e-10")
+Space
+Int ("0x01")
+Space
+Int ("0o07")
+Space
+Int ("0b10")
+Space
+String ("arg")
+Space
+String ("arg\\\\")
+Space
+Identifier ("true")
+Space
+Identifier ("false")
+Space
+Identifier ("null")
+EOF

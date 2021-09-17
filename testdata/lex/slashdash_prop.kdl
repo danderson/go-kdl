@@ -1,0 +1,11 @@
+Identifier ("node")
+Space
+IgnoreNode
+Space
+Identifier ("key")
+Equal
+String ("value")
+Space
+String ("arg")
+Newline
+EOF

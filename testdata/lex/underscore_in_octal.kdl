@@ -1,0 +1,4 @@
+Identifier ("node")
+Space
+Int ("0o012_3456_7")
+EOF

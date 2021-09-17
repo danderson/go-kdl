@@ -1,0 +1,5 @@
+Identifier ("node")
+Space
+String ("\"\\/\b\f\n\r\t")
+Newline
+EOF
