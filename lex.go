@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 )
 
@@ -87,8 +86,9 @@ type lexer struct {
 	rs []rune
 	// TODO: will we ever need to peek >1 rune? If not, can save some
 	// array nonsense here.
-	peekrs []rune // if non-zero, un-next()-ed runes in reverse order (last first)
-	atEOF  bool   // flips once to true when lexer finds EOF
+	peekrs       []rune // if non-zero, un-next()-ed runes in reverse order (last first)
+	atEOF        bool   // flips once to true when lexer finds EOF
+	lastWasSpace bool   // last emitted token was a tokSpace
 }
 
 func NewLexer(r io.Reader) *lexer {
@@ -118,6 +118,11 @@ func (l *lexer) Next() token {
 var lexClosed = errors.New("lexer closed")
 
 func (l *lexer) emit(t token) {
+	if t.typ == tokSpace && l.lastWasSpace {
+		l.ignore()
+		return
+	}
+	l.lastWasSpace = t.typ == tokSpace
 	select {
 	case l.tokens <- t:
 		l.rs = l.rs[:0]
@@ -128,6 +133,7 @@ func (l *lexer) emit(t token) {
 }
 
 func (l *lexer) err(format string, args ...interface{}) lexFn {
+	l.lastWasSpace = false
 	select {
 	case l.tokens <- token{typ: tokErr, err: fmt.Errorf(format, args...)}:
 	case <-l.close:
@@ -432,7 +438,6 @@ func (l *lexer) lexString() lexFn {
 				replace = 0
 			parseHex:
 				for i := 0; i < 6; i++ {
-					fmt.Fprintf(os.Stderr, "replace is %d\n", replace)
 					r = l.next()
 					switch {
 					case r >= '0' && r <= '9':
@@ -453,7 +458,6 @@ func (l *lexer) lexString() lexFn {
 			default:
 				return l.err("unknown escape sequence \\%s", string(r))
 			}
-			fmt.Fprintf(os.Stderr, "replace is %d\n", replace)
 			l.rs = append(l.rs[:replacePoint], replace)
 		}
 	}
