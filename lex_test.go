@@ -56,7 +56,14 @@ func TestConformance(t *testing.T) {
 				t.Fatalf("reading valid file: %v", err)
 			}
 			if diff := cmp.Diff(strings.Split(b.String(), "\n"), strings.Split(string(wantbs), "\n")); diff != "" {
-				t.Fatalf("unexpected lex output (-got+want):\n%s\n%s", diff, string(bs))
+				if updateOne {
+					if err := os.WriteFile(wantName, b.Bytes(), 0644); err != nil {
+						t.Fatalf("trying to update %s: %v", wantName, err)
+					}
+					updateOne = false
+				} else {
+					t.Fatalf("unexpected lex output (-got+want):\n%s\n%s", diff, string(bs))
+				}
 			}
 		})
 	}
